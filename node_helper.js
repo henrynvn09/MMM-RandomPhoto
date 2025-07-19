@@ -50,12 +50,12 @@ module.exports = NodeHelper.create({
             return false;
         }
 
-	const excludePattern = self.config.repositoryConfig.exclude?.map(pattern => new RegExp(pattern));
+	    const excludePattern = self.config.repositoryConfig.exclude?.map(pattern => new RegExp(pattern));
 
         var fileList = fs.readdirSync(path, { withFileTypes: true });
         if (fileList.length > 0) {
             for (var f = 0; f < fileList.length; f++) {
-		if (excludePattern?.some(regex => regex.test(fileList[f].name))) continue;
+		        if (excludePattern?.some(regex => regex.test(fileList[f].name))) continue;
 
                 if (fileList[f].isFile()) {
                     //TODO: add mime type check here

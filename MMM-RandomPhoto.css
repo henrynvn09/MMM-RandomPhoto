@@ -12,6 +12,15 @@
     object-fit: cover;
 }
 
+/* Image fit options */
+#randomPhoto img.fit-contain {
+    object-fit: contain;
+}
+
+#randomPhoto img.fit-fill {
+    object-fit: fill;
+}
+
 #randomPhoto img.grayscale {
     filter: grayscale(100%);
 }

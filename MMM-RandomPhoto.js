@@ -39,6 +39,7 @@ Module.register("MMM-RandomPhoto",{
         showStatusIcon: true,
         statusIconMode: "show", // one of: "show" (default / fallback) or "fade"
         statusIconPosition: "top_right", // one of: "top_right" (default / fallback), "top_left", "bottom_right" or "bottom_left"
+        imageFit: "cover", // one of: "cover" (default - fills container, may crop), "contain" (fits entire image), "fill" (stretches to fill)
     },
 
     start: function() {
@@ -59,6 +60,12 @@ Module.register("MMM-RandomPhoto",{
 
         // Set blur amount to a max of 10px
         if(this.config.blurAmount > 10) { this.config.blurAmount = 10; }
+
+        // Validate imageFit configuration
+        var validImageFitOptions = ['cover', 'contain', 'fill'];
+        if (validImageFitOptions.indexOf(this.config.imageFit) === -1) {
+            this.config.imageFit = 'cover';
+        }
 
         if (this.nextcloud || this.localdirectory) {
             this.sendSocketNotification('SET_CONFIG', this.config);
@@ -313,6 +320,12 @@ Module.register("MMM-RandomPhoto",{
                 img1.style.setProperty("--randomphoto-blur-value", this.config.blurAmount + "px");
                 img2.style.setProperty("--randomphoto-blur-value", this.config.blurAmount + "px");
             }
+        }
+
+        // Apply image fit configuration
+        if (this.config.imageFit && this.config.imageFit !== "cover") {
+            img1.classList.add("fit-" + this.config.imageFit);
+            img2.classList.add("fit-" + this.config.imageFit);
         }
 
         wrapper.appendChild(img1);

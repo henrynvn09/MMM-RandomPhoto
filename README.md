@@ -42,6 +42,7 @@ The entry in `config.js` can include the following options:
 | `showStatusIcon`      | *Optional* - Do you want to see the current status of automatic image loading ("play" / "paused" mode)?<br><br>**Type:** `boolean`<br>**Default:** `true`
 | `statusIconMode`      | *Optional* - Do you want to display the icon all the time or just fade in and out on status change?<br><br>**Type:** `string`<br>**Allowed:** `show` or `fade`<br>**Default:** `show`
 | `statusIconPosition`  | *Optional* - Where do you want to display the status icon?<br><br>**Type:** `string`<br>**Allowed:** `top_right`, `top_left`, `bottom_right` or `bottom_left`<br>**Default:** `top_right`
+| `imageFit`            | *Optional* - How should the image be fitted within the display area?<br><br>**Type:** `string`<br>**Allowed:** `cover` (fills container, may crop), `contain` (fits entire image), `fill` (stretches to fill)**Default:** `cover`
 
 Options for `repositoryConfig` - [more information](https://github.com/skuethe/MMM-RandomPhoto/blob/master/MMM-RandomPhoto.js#L18-L24):
 
@@ -72,6 +73,7 @@ Here are some examples for entries in `config.js`
         showStatusIcon: true,
         statusIconMode: "show",
         statusIconPosition: "top_right",
+        imageFit: "cover",
     }
 },
 ```
