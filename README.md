@@ -43,6 +43,10 @@ The entry in `config.js` can include the following options:
 | `statusIconMode`      | *Optional* - Do you want to display the icon all the time or just fade in and out on status change?<br><br>**Type:** `string`<br>**Allowed:** `show` or `fade`<br>**Default:** `show`
 | `statusIconPosition`  | *Optional* - Where do you want to display the status icon?<br><br>**Type:** `string`<br>**Allowed:** `top_right`, `top_left`, `bottom_right` or `bottom_left`<br>**Default:** `top_right`
 | `imageFit`            | *Optional* - How should the image be fitted within the display area?<br><br>**Type:** `string`<br>**Allowed:** `cover` (fills container, may crop), `contain` (fits entire image), `fill` (stretches to fill)**Default:** `cover`
+| `showMetadata`        | *Optional* - Show image metadata (date taken, location) extracted from EXIF data<br><br>**Type:** `boolean`<br>**Default:** `true`
+| `metadataPosition`    | *Optional* - Where to display the metadata information<br><br>**Type:** `string`<br>**Allowed:** `bottom_left`, `bottom_right`, `top_left`, `top_right`<br>**Default:** `bottom_left`
+| `metadataMode`        | *Optional* - How to display the metadata<br><br>**Type:** `string`<br>**Allowed:** `show` (always visible), `fade` (fade in/out on image change), `hide` (hidden)<br>**Default:** `show`
+| `metadataCacheSize`   | *Optional* - Number of metadata entries to cache for performance optimization<br><br>**Type:** `int`<br>**Default:** `100`
 
 Options for `repositoryConfig` - [more information](https://github.com/skuethe/MMM-RandomPhoto/blob/master/MMM-RandomPhoto.js#L18-L24):
 
@@ -100,7 +104,7 @@ Here are some examples for entries in `config.js`
 },
 ```
 
-**local directory**:
+**local directory with metadata**:
 
 ```js
 {
@@ -113,9 +117,40 @@ Here are some examples for entries in `config.js`
             recursive: true,
             exclude: ["tmp", "#recycle"],
         },
+        showMetadata: true,
+        metadataPosition: "bottom_left",
+        metadataMode: "fade",
+        metadataCacheSize: 150,
     }
 },
 ```
+
+## Metadata Features
+
+The module can extract and display metadata from your images, including:
+
+- **Date/Time Taken**: Extracted from EXIF data (DateTimeOriginal, DateTime, or CreateDate)
+- **Location**: Converted from GPS coordinates in EXIF data to readable location names
+
+### Performance Optimizations
+
+- **Smart Caching**: Metadata is cached to avoid repeated EXIF processing
+- **Lazy Loading**: Metadata is only extracted when an image is displayed
+- **Location Caching**: Reverse geocoding results are cached to minimize API calls
+- **Hardware Acceleration**: CSS transforms use GPU acceleration for smooth animations
+
+### Metadata Display Modes
+
+- `show`: Always visible while image is displayed
+- `fade`: Appears for 5 seconds then fades out
+- `hide`: Metadata extraction still occurs but display is hidden
+
+### Location Services
+
+The module uses OpenStreetMap's Nominatim service for reverse geocoding (converting GPS coordinates to readable locations). This is:
+- Free to use
+- Respects rate limiting
+- Falls back to coordinates if service is unavailable
 
 ## Notifications
 

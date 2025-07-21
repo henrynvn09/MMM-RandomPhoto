@@ -40,6 +40,10 @@ Module.register("MMM-RandomPhoto",{
         statusIconMode: "show", // one of: "show" (default / fallback) or "fade"
         statusIconPosition: "top_right", // one of: "top_right" (default / fallback), "top_left", "bottom_right" or "bottom_left"
         imageFit: "cover", // one of: "cover" (default - fills container, may crop), "contain" (fits entire image), "fill" (stretches to fill)
+        showMetadata: true, // Show image metadata (date taken, location)
+        metadataPosition: "bottom_left", // one of: "bottom_left" (default), "bottom_right", "top_left", "top_right"
+        metadataMode: "show", // one of: "show" (always visible), "fade" (fade in/out on image change), "hide" (hidden)
+        metadataCacheSize: 100, // Number of metadata entries to cache for performance
     },
 
     start: function() {
@@ -47,6 +51,9 @@ Module.register("MMM-RandomPhoto",{
         this.imageList = null; // Used for nextcloud and localdirectory image list
         this.currentImageIndex = -1; // Used for nextcloud and localdirectory image list
         this.running = false;
+        this.metadataCache = new Map(); // Cache for image metadata
+        this.currentMetadata = null; // Current image metadata
+        this.metadataTimeout = null; // Timeout for fade animations
 
         this.nextcloud = false;
         this.localdirectory = false;
@@ -114,14 +121,15 @@ Module.register("MMM-RandomPhoto",{
 
         if (self.localdirectory || self.nextcloud) {
             if (self.imageList && self.imageList.length > 0) {
-                url = "/" + this.name + "/images/" + this.returnImageFromList(mode);
+                var originalImagePath = this.returnImageFromList(mode);
+                url = "/" + this.name + "/images/" + originalImagePath;
 
                 jQuery.ajax({
                     method: "GET",
                     url: url,
                 })
                 .done(function (data) {
-                    self.smoothImageChange(data);
+                    self.smoothImageChange(data, originalImagePath);
                 })
                 .fail(function( jqXHR, textStatus ) {
                     Log.error("[" + self.name + "] Request failed: " + textStatus);
@@ -158,9 +166,10 @@ Module.register("MMM-RandomPhoto",{
         }
     },
 
-    smoothImageChange: function(url) {
+    smoothImageChange: function(url, imagePath = null) {
         var self = this;
         var img = $('<img />').attr('src', url);
+        
         img.on('load', function() {
             $('#randomPhoto-placeholder1').attr('src', url).animate({
                 opacity: self.config.opacity
@@ -173,6 +182,14 @@ Module.register("MMM-RandomPhoto",{
             }, self.config.animationSpeed, function() {
                 $(this).attr('id', 'randomPhoto-placeholder1');
             });
+            
+            // Handle metadata display
+            if (self.config.showMetadata && (self.localdirectory || self.nextcloud)) {
+                self.loadImageMetadata(imagePath || url);
+            } else if (self.config.showMetadata) {
+                // For picsum, hide metadata as it doesn't have real EXIF data
+                self.hideMetadata();
+            }
         });
     },
 
@@ -299,6 +316,164 @@ Module.register("MMM-RandomPhoto",{
         }
     },
 
+    loadImageMetadata: function(imagePath) {
+        var self = this;
+        
+        console.log("[MMM-RandomPhoto] Loading metadata for:", imagePath);
+        
+        // Check cache first for performance
+        if (self.metadataCache.has(imagePath)) {
+            console.log("[MMM-RandomPhoto] Using cached metadata");
+            self.displayMetadata(self.metadataCache.get(imagePath));
+            return;
+        }
+        
+        // Request metadata from node_helper
+        self.sendSocketNotification('FETCH_IMAGE_METADATA', imagePath);
+    },
+    
+    displayMetadata: function(metadata) {
+        var self = this;
+        
+        console.log("[MMM-RandomPhoto] Displaying metadata:", metadata);
+        
+        if (!self.config.showMetadata || self.config.metadataMode === "hide") {
+            console.log("[MMM-RandomPhoto] Metadata display disabled in config");
+            return;
+        }
+        
+        var metadataElement = document.getElementById("randomPhotoMetadata");
+        if (!metadataElement) {
+            console.log("[MMM-RandomPhoto] Metadata element not found in DOM");
+            return;
+        }
+        
+        var content = "";
+        var hasContent = false;
+        
+        if (metadata.dateTime) {
+            content += '<div class="metadata-date">';
+            content += '<i class="fas fa-calendar-alt metadata-icon"></i>';
+            content += self.formatDate(metadata.dateTime);
+            content += '</div>';
+            hasContent = true;
+        }
+        
+        if (metadata.location) {
+            content += '<div class="metadata-location">';
+            content += '<i class="fas fa-map-marker-alt metadata-icon"></i>';
+            content += self.escapeHtml(metadata.location);
+            content += '</div>';
+            hasContent = true;
+        }
+        
+        if (hasContent) {
+            console.log("[MMM-RandomPhoto] Showing metadata with content:", content);
+            // Performance optimization: use requestAnimationFrame for smooth animations
+            requestAnimationFrame(function() {
+                metadataElement.innerHTML = content;
+                metadataElement.classList.remove("rpmhidden", "metadata-fade-out");
+                metadataElement.classList.add("metadata-fade-in");
+                
+                if (self.config.metadataMode === "fade") {
+                    // Clear any existing timeout
+                    if (self.metadataTimeout) {
+                        clearTimeout(self.metadataTimeout);
+                    }
+                    
+                    // Fade out after 5 seconds
+                    self.metadataTimeout = setTimeout(function() {
+                        requestAnimationFrame(function() {
+                            metadataElement.classList.remove("metadata-fade-in");
+                            metadataElement.classList.add("metadata-fade-out");
+                            
+                            // Hide after animation completes
+                            setTimeout(function() {
+                                metadataElement.classList.add("rpmhidden");
+                            }, 300);
+                        });
+                    }, 5000);
+                }
+            });
+        } else {
+            console.log("[MMM-RandomPhoto] No metadata content to display");
+            self.hideMetadata();
+        }
+    },
+    
+    hideMetadata: function() {
+        var metadataElement = document.getElementById("randomPhotoMetadata");
+        if (metadataElement) {
+            // Clear any existing timeout
+            if (this.metadataTimeout) {
+                clearTimeout(this.metadataTimeout);
+                this.metadataTimeout = null;
+            }
+            
+            requestAnimationFrame(function() {
+                metadataElement.classList.remove("metadata-fade-in");
+                metadataElement.classList.add("metadata-fade-out");
+                
+                setTimeout(function() {
+                    metadataElement.classList.add("rpmhidden");
+                }, 300);
+            });
+        }
+    },
+    
+    escapeHtml: function(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+    
+    formatDate: function(dateString) {
+        try {
+            var date = new Date(dateString.replace(/(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3'));
+            
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                return dateString;
+            }
+            
+            // Use Intl.DateTimeFormat for better performance and localization
+            return new Intl.DateTimeFormat(undefined, {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).format(date);
+        } catch (e) {
+            // Fallback: try to extract just the date part
+            if (typeof dateString === 'string' && dateString.length >= 10) {
+                try {
+                    var datePart = dateString.substring(0, 10).replace(/:/g, '-');
+                    var fallbackDate = new Date(datePart);
+                    if (!isNaN(fallbackDate.getTime())) {
+                        return fallbackDate.toLocaleDateString();
+                    }
+                } catch (fallbackError) {
+                    // Just return the original string
+                }
+            }
+            return dateString;
+        }
+    },
+    
+    cacheMetadata: function(imagePath, metadata) {
+        var self = this;
+        
+        // Implement LRU cache to limit memory usage
+        if (self.metadataCache.size >= self.config.metadataCacheSize) {
+            var firstKey = self.metadataCache.keys().next().value;
+            self.metadataCache.delete(firstKey);
+        }
+        
+        self.metadataCache.set(imagePath, metadata);
+    },
+
     getDom: function() {
         var wrapper = document.createElement("div");
         wrapper.id = "randomPhoto";
@@ -345,6 +520,41 @@ Module.register("MMM-RandomPhoto",{
             statusIconObject.innerHTML = '<i id="randomPhotoStatusIcon" class="rpihidden"></i>';
             wrapper.appendChild(statusIconObject);
         }
+        
+        // Add metadata display element
+        if (this.config.showMetadata) {
+            var validateMetadataPosition = ['bottom_left', 'bottom_right', 'top_left', 'top_right'];
+            if (validateMetadataPosition.indexOf(this.config.metadataPosition) === -1) {
+                this.config.metadataPosition = 'bottom_left';
+            }
+            
+            var metadataObject = document.createElement("div");
+            metadataObject.id = "randomPhotoMetadata";
+            metadataObject.classList.add("rpmhidden"); // Start hidden
+            
+            // Position the metadata element
+            var positionClasses = this.config.metadataPosition.split("_");
+            metadataObject.style.position = "absolute";
+            
+            if (positionClasses.includes("top")) {
+                metadataObject.style.top = "20px";
+                metadataObject.style.bottom = "auto";
+            } else {
+                metadataObject.style.bottom = "20px";
+                metadataObject.style.top = "auto";
+            }
+            
+            if (positionClasses.includes("right")) {
+                metadataObject.style.right = "20px";
+                metadataObject.style.left = "auto";
+            } else {
+                metadataObject.style.left = "20px";
+                metadataObject.style.right = "auto";
+            }
+            
+            wrapper.appendChild(metadataObject);
+        }
+        
         return wrapper;
     },
 
@@ -414,6 +624,12 @@ Module.register("MMM-RandomPhoto",{
             if(!this.config.startHidden) {
                 this.resumeImageLoading(true);
             }
+        }
+        if (notification === "IMAGE_METADATA") {
+            console.log("[MMM-RandomPhoto] Received metadata notification:", payload);
+            // Cache the metadata for performance
+            this.cacheMetadata(payload.imagePath, payload.metadata);
+            this.displayMetadata(payload.metadata);
         }
     },
 
